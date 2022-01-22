@@ -14,18 +14,26 @@ from tqdm import tqdm
 import glob
 
 def main():
-    # name of the input file
+    # get all files
     fns = glob.glob('./data/*.*')
     for imname in tqdm(fns):
 
         # read in the image
         im =  skio.imread(imname)
+
+        # split image
         b, g, r = split(im)
+
+        # create unaligned iamge for comparison 
         orig = np.dstack([r,g,b])
+
+        # crop borders 
+        r, g, b = crop_borders(r,g,b,crop_percentage=0.12)
 
         # get edges
         eb, eg, er = edge_detection(r,g,b)
         
+        # only do the downsampling technique if its a larger image!
         if b.shape[0] > 1000:
             height = 3
             edge_p = pyramids(eb,er,eg, height)
@@ -33,58 +41,69 @@ def main():
             height = 1
             edge_p = pyramids(eb,er,eg, height)
 
+        # displacement for r and g channels
         dr, dg = np.array([0,0]), np.array([0,0])
 
+        # for each level of downsampling
         for i in range(height):
+            # if its the most downsampled, search 7 percent of image 
             if i == 0:
-                search_area = (int(0.07 * edge_p['blue'][0].shape[0]), int(0.07* edge_p['blue'][0].shape[0]))
+                search_area = (int(0.07 * edge_p['blue'][0].shape[0]), int(0.07* edge_p['blue'][0].shape[1]))
+            # if its the full size image roll the image and exit
             elif i == height - 1:
                 edge_p['red'][i] = np.roll(edge_p['red'][i], tuple(dr), axis=(1,0))
                 edge_p['green'][i] = np.roll(edge_p['green'][i], tuple(dg), axis=(1,0))
 
-
                 break
             else:
+                # any other sampled image just search in a smaller 2,2 area 
                 search_area = (2,2)
+
+                # previous adjustments
                 # adjust red and search in 2,2
                 edge_p['red'][i] = np.roll(edge_p['red'][i], tuple(dr), axis=(1,0))
                 # adjust green and search in 2,2
                 edge_p['green'][i] = np.roll(edge_p['green'][i], tuple(dg), axis=(1,0))
 
-
+            # align
             res = align(edge_p['red'][i], edge_p['green'][i], edge_p['blue'][i], search_area)
             dr  = dr + res[0]
             dg = dg + res[1]
+
+            # only scale displacement if we are downsampling images
             if height != 1:
                 dr, dg = dr*2, dg*2
 
         print('Displacement for R: {}'.format(dr))
         print('Displacement for G: {}'.format(dg))
 
+        # displace r,g by final displacements
         ar = np.roll(r, dr, axis=(1,0))
         ag = np.roll(g, dg, axis=(1,0))
+
+        # create aligned image
         im_out = np.dstack([ar,ag,b])
 
         # save the image
-        fname = './colorizations_complete/'+os.path.basename(imname).split('.')[0] + '_' + str(height)
+        dirs = './colorizations_complete_with_crop_12_percent/'
+        if not os.path.exists(dirs):
+            os.makedirs(dirs)
+        fname = dirs+os.path.basename(imname).split('.')[0] + '_' + str(height)
         skio.imsave(fname+'.jpg', im_out)
         skio.imsave(fname+'_original.jpg', orig)
 
 def pyramids(eb, er, eg, height=4):
+    """
+    Takes in the three color channels and downsamples by half height times.
+    Returns dictionary of the pyramid downsampling
+    """
     pyramids = {'red':[], 'green': [],'blue': []}
     for i in range(height-1,-1, -1):
         factor = 0.5**i
-        if i == 0:
-            pyramids['blue'].append(eb)
-            pyramids['red'].append(er)
-            pyramids['green'].append(eg)
-        else:
-            pyramids['blue'].append(cv2.resize(eb, (0,0), fx=factor, fy=factor))
-            pyramids['red'].append(cv2.resize(er, (0,0), fx=factor, fy=factor))
-            pyramids['green'].append(cv2.resize(eg, (0,0), fx=factor, fy=factor))
-    # pyramids['red'] = np.array(pyramids['red'])
-    # pyramids['green'] = np.array(pyramids['green'])
-    # pyramids['blue'] = np.array(pyramids['blue'])
+        
+        pyramids['blue'].append(cv2.resize(eb, (0,0), fx=factor, fy=factor))
+        pyramids['red'].append(cv2.resize(er, (0,0), fx=factor, fy=factor))
+        pyramids['green'].append(cv2.resize(eg, (0,0), fx=factor, fy=factor))
 
     return pyramids
 
@@ -112,13 +131,11 @@ def align(r,g,b, search_area):
     min_idx_G = np.argmin(error_G)
     min_idx_R = np.argmin(error_R)
 
-    # R, G, b
     return np.array(displacement_R[min_idx_R]), np.array(displacement_G[min_idx_G])
 
 
-
 def ssq(A, B):
-    return np.sum( np.square(A-B) )
+    return np.mean(np.sum( np.square(A-B) ))
 
 def split(im):
 
@@ -134,7 +151,16 @@ def split(im):
     r = im[2*height: 3*height]
     return b,g,r
 
-    
+def crop_borders(r, g, b, crop_percentage=0.15):
+    x,y = r.shape
+
+    crop_x, crop_y = int(x*crop_percentage), int(y*crop_percentage)
+
+    r = r[crop_x:x-crop_x, crop_y:y-crop_y]
+    g = g[crop_x:x-crop_x, crop_y:y-crop_y]
+    b = b[crop_x:x-crop_x, crop_y:y-crop_y]
+
+    return r, g, b
 
 if __name__ == '__main__':
     main()
