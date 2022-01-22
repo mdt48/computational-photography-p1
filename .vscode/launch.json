@@ -8,9 +8,8 @@
             "name": "driver",
             "type": "python",
             "request": "launch",
-            "program": "driver.py",
+            "program": "colorize.py",
             "console": "integratedTerminal",
-            "args": ["--path", "data\\00125v.jpg"],
             "justMyCode":true
         }
     ]
