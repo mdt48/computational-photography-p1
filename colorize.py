@@ -15,8 +15,8 @@ import glob
 
 def main():
     # get all files
-    # fns = glob.glob('./data/*.*')
-    fns = ['/Users/mdt/projects/computational-photography-p1/data/00458u.jpg']
+    fns = glob.glob('./data/*.*')
+    # fns = ['/Users/mdt/projects/computational-photography-p1/data/00458u.jpg']
     for imname in tqdm(fns):
 
         # read in the image
@@ -29,10 +29,10 @@ def main():
         orig = np.dstack([r,g,b])
 
         # crop borders 
-        # r, g, b = crop_borders(r,g,b,crop_percentage=0.12)
+        r, g, b = crop_borders(r,g,b,crop_percentage=0.12)
 
         # get edges
-        eb, eg, er = edge_detection(r,g,b)
+        # eb, eg, er = edge_detection(r,g,b)
         eb, eg, er = b, g ,r
         
         # only do the downsampling technique if its a larger image!
@@ -87,14 +87,13 @@ def main():
         im_out = np.dstack([ar,ag,b])
 
         # save the image
-        dirs = './crop_no_edge/'
+        dirs = './auto_crop_no_edge/'
         if not os.path.exists(dirs):
             os.makedirs(dirs)
         fname = dirs+os.path.basename(imname).split('.')[0] + '_' + str(height)
         skio.imsave(fname+'.jpg', im_out)
         skio.imsave(fname+'_original.jpg', orig)
 
-        skio.imsave()
 
 def pyramids(eb, er, eg, height=4):
     """
@@ -156,14 +155,64 @@ def split(im):
     return b,g,r
 
 def crop_borders(r, g, b, crop_percentage=0.15):
-    x,y = r.shape
+    x,y = b.shape
 
-    crop_x, crop_y = int(x*crop_percentage), int(y*crop_percentage)
+    # crop_x, crop_y = int(x*crop_percentage), int(y*crop_percentage)
 
-    r = r[crop_x:x-crop_x, crop_y:y-crop_y]
-    g = g[crop_x:x-crop_x, crop_y:y-crop_y]
-    b = b[crop_x:x-crop_x, crop_y:y-crop_y]
+    # r = r[crop_x:x-crop_x, crop_y:y-crop_y]
+    # g = g[crop_x:x-crop_x, crop_y:y-crop_y]
+    # b = b[crop_x:x-crop_x, crop_y:y-crop_y]
+    margin = 5
+    
+    # TRIM WHITE
+    middle_of_b = b.shape[0] // 2
+    white_idxs = np.argwhere((b[middle_of_b]*255).astype(int) > 200)
+    
+    white_width = 0
+    for idx, val in enumerate(white_idxs):
+        if 5 < np.abs(int(white_idxs[idx+1]) - val):
+            white_width = idx
+            break
 
+    middle_of_b = b.shape[1] // 2
+    white_idxs = np.argwhere((b[:, middle_of_b]*255).astype(int) > 200)
+    
+    white_height = 0
+    for idx, val in enumerate(white_idxs):
+        if idx + 1 >= len(white_idxs):
+            white_height = len(white_idxs)
+            break
+        if 5< np.abs(int(white_idxs[idx+1]) - val):
+            white_height = idx
+            break
+
+    # TRIM black
+    middle_of_b = b.shape[0] // 2
+    black_idxs = np.argwhere((b[middle_of_b]*255).astype(int) > 200)
+    
+    black_width = 0
+    for idx, val in enumerate(black_idxs):
+        if 5 < np.abs(int(black_idxs[idx+1]) - val):
+            black_width = idx
+            break
+
+    middle_of_b = b.shape[1] // 2
+    black_idxs = np.argwhere((b[:, middle_of_b]*255).astype(int) > 200)
+    
+    black_height = 0
+    for idx, val in enumerate(black_idxs):
+        if idx + 1 >= len(black_idxs):
+            black_height = len(black_idxs)
+            break
+        if 5< np.abs(int(black_idxs[idx+1]) - val):
+            black_height = idx
+            break
+    total_width = black_width + white_width
+    total_height = white_height + black_height
+
+    r = r[total_width:x-total_width, total_height:y-total_height]
+    g = g[total_width:x-total_width, total_height:y-total_height]
+    b = b[total_width:x-total_width, total_height:y-total_height]
     return r, g, b
 
 if __name__ == '__main__':
