@@ -15,7 +15,8 @@ import glob
 
 def main():
     # get all files
-    fns = glob.glob('./data/*.*')
+    # fns = glob.glob('./data/*.*')
+    fns = ['/Users/mdt/projects/computational-photography-p1/data/00458u.jpg']
     for imname in tqdm(fns):
 
         # read in the image
@@ -28,10 +29,11 @@ def main():
         orig = np.dstack([r,g,b])
 
         # crop borders 
-        r, g, b = crop_borders(r,g,b,crop_percentage=0.12)
+        # r, g, b = crop_borders(r,g,b,crop_percentage=0.12)
 
         # get edges
         eb, eg, er = edge_detection(r,g,b)
+        eb, eg, er = b, g ,r
         
         # only do the downsampling technique if its a larger image!
         if b.shape[0] > 1000:
@@ -85,12 +87,14 @@ def main():
         im_out = np.dstack([ar,ag,b])
 
         # save the image
-        dirs = './colorizations_complete_with_crop_12_percent/'
+        dirs = './crop_no_edge/'
         if not os.path.exists(dirs):
             os.makedirs(dirs)
         fname = dirs+os.path.basename(imname).split('.')[0] + '_' + str(height)
         skio.imsave(fname+'.jpg', im_out)
         skio.imsave(fname+'_original.jpg', orig)
+
+        skio.imsave()
 
 def pyramids(eb, er, eg, height=4):
     """
@@ -100,6 +104,7 @@ def pyramids(eb, er, eg, height=4):
     pyramids = {'red':[], 'green': [],'blue': []}
     for i in range(height-1,-1, -1):
         factor = 0.5**i
+        # factor = 0.10
         
         pyramids['blue'].append(cv2.resize(eb, (0,0), fx=factor, fy=factor))
         pyramids['red'].append(cv2.resize(er, (0,0), fx=factor, fy=factor))
@@ -132,7 +137,6 @@ def align(r,g,b, search_area):
     min_idx_R = np.argmin(error_R)
 
     return np.array(displacement_R[min_idx_R]), np.array(displacement_G[min_idx_G])
-
 
 def ssq(A, B):
     return np.mean(np.sum( np.square(A-B) ))
