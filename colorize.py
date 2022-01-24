@@ -46,7 +46,7 @@ def main():
         # displacement for r and g channels
         dr, dg = np.array([0,0]), np.array([0,0])
 
-        # for each level of downsampling
+        # for each level of downsampling(height = height of pyramid)
         for i in range(height):
             # if its the most downsampled, search 7 percent of image 
             if i == 0:
@@ -55,13 +55,10 @@ def main():
             elif i == height - 1:
                 edge_p['red'][i] = np.roll(edge_p['red'][i], tuple(dr), axis=(1,0))
                 edge_p['green'][i] = np.roll(edge_p['green'][i], tuple(dg), axis=(1,0))
-
                 break
             else:
                 # any other sampled image just search in a smaller 2,2 area 
                 search_area = (2,2)
-
-                # previous adjustments
                 # adjust red and search in 2,2
                 edge_p['red'][i] = np.roll(edge_p['red'][i], tuple(dr), axis=(1,0))
                 # adjust green and search in 2,2
@@ -69,12 +66,16 @@ def main():
 
             # align
             res = align(edge_p['red'][i], edge_p['green'][i], edge_p['blue'][i], search_area)
-            dr  = dr + res[0]
-            dg = dg + res[1]
 
             # only scale displacement if we are downsampling images
             if height != 1:
                 dr, dg = dr*2, dg*2
+
+            # total displacement
+            dr  = dr + res[0]
+            dg = dg + res[1]
+
+           
 
         print('Displacement for R: {}'.format(dr))
         print('Displacement for G: {}'.format(dg))
@@ -156,64 +157,37 @@ def split(im):
 
 def crop_borders(r, g, b, crop_percentage=0.15):
     x,y = b.shape
-
-    # crop_x, crop_y = int(x*crop_percentage), int(y*crop_percentage)
-
-    # r = r[crop_x:x-crop_x, crop_y:y-crop_y]
-    # g = g[crop_x:x-crop_x, crop_y:y-crop_y]
-    # b = b[crop_x:x-crop_x, crop_y:y-crop_y]
     margin = 5
     
-    # TRIM WHITE
-    middle_of_b = b.shape[0] // 2
-    white_idxs = np.argwhere((b[middle_of_b]*255).astype(int) > 200)
-    
-    white_width = 0
-    for idx, val in enumerate(white_idxs):
-        if 5 < np.abs(int(white_idxs[idx+1]) - val):
-            white_width = idx
-            break
+    # white border size
+    white_width, white_height = crop_color(b, margin, color=200)
 
-    middle_of_b = b.shape[1] // 2
-    white_idxs = np.argwhere((b[:, middle_of_b]*255).astype(int) > 200)
-    
-    white_height = 0
-    for idx, val in enumerate(white_idxs):
-        if idx + 1 >= len(white_idxs):
-            white_height = len(white_idxs)
-            break
-        if 5< np.abs(int(white_idxs[idx+1]) - val):
-            white_height = idx
-            break
-
-    # TRIM black
-    middle_of_b = b.shape[0] // 2
-    black_idxs = np.argwhere((b[middle_of_b]*255).astype(int) > 200)
-    
-    black_width = 0
-    for idx, val in enumerate(black_idxs):
-        if 5 < np.abs(int(black_idxs[idx+1]) - val):
-            black_width = idx
-            break
-
-    middle_of_b = b.shape[1] // 2
-    black_idxs = np.argwhere((b[:, middle_of_b]*255).astype(int) > 200)
-    
-    black_height = 0
-    for idx, val in enumerate(black_idxs):
-        if idx + 1 >= len(black_idxs):
-            black_height = len(black_idxs)
-            break
-        if 5< np.abs(int(black_idxs[idx+1]) - val):
-            black_height = idx
-            break
-    total_width = black_width + white_width
-    total_height = white_height + black_height
+    total_width = white_width
+    total_height = white_height
 
     r = r[total_width:x-total_width, total_height:y-total_height]
     g = g[total_width:x-total_width, total_height:y-total_height]
     b = b[total_width:x-total_width, total_height:y-total_height]
     return r, g, b
+
+def crop_color(b, margin, color):
+    middle_of_b = b.shape[0] // 2
+    idxs = np.argwhere((b[middle_of_b]*255).astype(int) > color)
+    
+    white_width = get_size_of_border(margin, idxs)
+
+    middle_of_b = b.shape[1] // 2
+    idxs = np.argwhere((b[:, middle_of_b]*255).astype(int) > color)
+    
+    white_height = get_size_of_border(margin, idxs)
+    return white_width, white_height
+
+def get_size_of_border(margin, idxs):
+    for idx, val in enumerate(idxs):
+        if idx + 1 >= len(idxs):
+            return len(idxs)
+        if margin < np.abs(int(idxs[idx+1]) - val):
+            return idx
 
 if __name__ == '__main__':
     main()
